@@ -1,0 +1,89 @@
+{
+  "variables": {
+    "esxi_username":            "{{env `VCENTER_USERNAME`}}",
+    "esxi_password":            "{{env `VCENTER_PASSWORD`}}",
+    "esxi_host":                "{{env `VCENTER_HOST`}}",
+    "esxi_datastore":           "{{env `VCENTER_DATASTORE`}}",
+    "guest_cpu":                "{{env `GUEST_CPU`}}",
+    "guest_mem":                "{{env `GUEST_MEM`}}",
+    "guest_disk":               "{{env `GUEST_DISK`}}"
+  },
+  "builders": [
+    {
+      "type": "vmware-iso",
+      "headless": true,
+      "insecure_connection": true,
+      "vnc_disable_password": true,
+      "remote_type": "esx5",
+      "remote_host": "{{user `esxi_host`}}",
+      "remote_datastore": "{{user `esxi_datastore`}}",
+      "remote_username": "{{user `esxi_username`}}",
+      "remote_password": "{{user `esxi_password`}}",
+      "remote_output_directory": "templates/d8/td8-{{user `guest_cpu`}}-{{user `guest_mem`}}-{{user `guest_disk`}}",
+      "keep_registered": false,
+      "boot_wait": "7s",
+      "http_directory": "http",
+      "boot_command": [
+        "<esc><wait>",
+        "install <wait>",
+        "preseed/url=http://{{ .HTTPIP }}:{{ .HTTPPort }}/preseed.cfg <wait>",
+        "debian-installer=en_US <wait>",
+        "auto <wait>",
+        "locale=en_US <wait>",
+        "kbd-chooser/method=us <wait>",
+        "netcfg/get_hostname={{ .Name }} <wait>",
+        "netcfg/get_domain=k11s.cloud.vsk.local <wait>",
+        "fb=false <wait>",
+        "debconf/frontend=noninteractive <wait>",
+        "console-setup/ask_detect=false <wait>",
+        "console-keymaps-at/keymap=us <wait>",
+        "keyboard-configuration/xkb-keymap=us <wait>",
+        "<enter><wait>"
+      ],
+      "network_adapter_type": "vmxnet3",
+      "ssh_wait_timeout": "50000s",
+      "tools_upload_flavor": "linux",
+      "tools_upload_path": "/tmp/vmware_tools_{{.Flavor}}.iso",
+
+      "shutdown_command": "echo '/sbin/halt -h -p' > /tmp/shutdown.sh; sudo -S sh '/tmp/shutdown.sh'",
+
+      "vm_name": "td8-{{user `guest_cpu`}}-{{user `guest_mem`}}-{{user `guest_disk`}}",
+      "version": 15,
+      "cpus": "{{user `guest_cpu`}}",
+      "memory": "{{user `guest_mem`}}",
+      "guest_os_type": "debian8-64",
+      "disk_type_id": "thin",
+      "disk_size": "{{user `guest_disk`}}",
+      "ssh_username": "ansible",
+      "ssh_password": "PASS_HERE",
+      "ssh_timeout": "5m",
+
+      "iso_checksum": "ea444d6f8ac95fd51d2aedb8015c57410d1ad19b494cedec6914c17fda02733c",
+      "iso_urls": [
+        "http://192.168.1.21:9800/infrastructure/ISO/Debian/debian-8.11.1-amd64-netinst.iso"
+      ],
+      "vmx_data": {
+        "ethernet0.networkName": "VM Network",
+        "ethernet0.present": "true",
+        "ethernet0.startConnected": "true"
+      },
+      "skip_export": true
+    }
+  ],
+  "provisioners": [
+    {
+      "type": "shell",
+      "pause_before": "5s",
+      "execute_command": "echo 'PASS_HERE'|sudo -S sh '{{.Path}}'",
+      "override": {
+        "vmware-iso": {
+          "scripts": [
+            "scripts/base.sh",
+            "scripts/ansible.sh",
+            "scripts/cleanup.sh"
+          ]
+        }
+      }
+    }
+  ]
+}
